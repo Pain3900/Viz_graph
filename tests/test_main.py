@@ -1,4 +1,4 @@
-"""Тесты точки входа: вывод прямых зависимостей и коды завершения."""
+"""Тесты точки входа: вывод графа и коды завершения."""
 
 import contextlib
 import io
@@ -12,13 +12,21 @@ from depgraph.__main__ import main
 
 URL = "https://registry.npmjs.org"
 REPOS = os.path.join(os.path.dirname(__file__), "..", "repos")
-SIMPLE = os.path.join(REPOS, "simple.txt")
-EXPRESS = {
-    "name": "express",
-    "dist-tags": {"latest": "5.1.0"},
-    "versions": {"5.1.0": {"dependencies": {
-        "accepts": "^2.0.0", "body-parser": "^2.2.0"}}},
+REGISTRY = {
+    "debug": ("4.4.3", {"ms": "^2.1.3"}),
+    "ms": ("2.1.3", {}),
 }
+
+
+def fake_urlopen(request, timeout):
+    """Ответ реестра по имени пакета в конце URL."""
+    name = request.full_url.rsplit("/", 1)[1]
+    if name not in REGISTRY:
+        raise urllib.error.HTTPError(URL, 404, "Not Found", None, None)
+    version, dependencies = REGISTRY[name]
+    document = {"dist-tags": {"latest": version},
+                "versions": {version: {"dependencies": dependencies}}}
+    return io.BytesIO(json.dumps(document).encode("utf-8"))
 
 
 class MainTest(unittest.TestCase):
@@ -29,49 +37,63 @@ class MainTest(unittest.TestCase):
         out = io.StringIO()
         err = io.StringIO()
         with contextlib.redirect_stdout(out), \
-                contextlib.redirect_stderr(err):
+                contextlib.redirect_stderr(err), \
+                mock.patch("urllib.request.urlopen", fake_urlopen):
             code = main(argv)
         return code, out.getvalue(), err.getvalue()
 
-    def test_registry_dependencies(self):
-        """Прямые зависимости из реестра с диапазонами версий."""
-        body = io.BytesIO(json.dumps(EXPRESS).encode("utf-8"))
-        with mock.patch("urllib.request.urlopen", return_value=body):
-            code, out, err = self.run_main(
-                ["--package", "express", "--repo", URL])
+    def run_file(self, package, file_name, *options):
+        """Запустить в тестовом режиме с файлом из repos/."""
+        return self.run_main(
+            ["--package", package, "--repo",
+             os.path.join(REPOS, file_name), "--test-mode", *options])
+
+    def test_registry_graph(self):
+        """Граф из реестра: пакеты подписаны версиями."""
+        code, out, err = self.run_main(["--package", "debug", "--repo", URL])
         self.assertEqual((code, err), (0, ""))
-        self.assertEqual(out, "Direct dependencies of express@5.1.0:\n"
-                              "  accepts ^2.0.0\n"
-                              "  body-parser ^2.2.0\n")
+        self.assertEqual(out, "Dependency graph of debug@4.4.3 "
+                              "(packages: 2):\n"
+                              "  debug@4.4.3 -> ms\n"
+                              "  ms@2.1.3 -> (none)\n")
 
-    def test_test_mode_dependencies(self):
-        """Прямые зависимости из тестового файла."""
-        code, out, _ = self.run_main(
-            ["--package", "A", "--repo", SIMPLE, "--test-mode"])
+    def test_simple_file(self):
+        """Транзитивные зависимости из тестового файла."""
+        code, out, _ = self.run_file("A", "simple.txt")
         self.assertEqual(code, 0)
-        self.assertEqual(out, "Direct dependencies of A:\n  B\n  C\n")
+        self.assertEqual(out, "Dependency graph of A (packages: 4):\n"
+                              "  A -> B, C\n  B -> D\n"
+                              "  D -> (none)\n  C -> D\n")
 
-    def test_no_dependencies(self):
-        """Пакет без зависимостей."""
-        _, out, _ = self.run_main(
-            ["--package", "D", "--repo", SIMPLE, "--test-mode"])
-        self.assertEqual(out, "Direct dependencies of D:\n  (none)\n")
+    def test_cycle_file(self):
+        """Цикл выводится отдельной строкой."""
+        _, out, _ = self.run_file("A", "cycle.txt")
+        self.assertTrue(out.endswith("Cycle: A -> B -> C -> A\n"))
+
+    def test_filter_file(self):
+        """Фильтр исключает пакеты с подстрокой."""
+        _, out, _ = self.run_file("APP", "filter.txt", "--filter", "TEST")
+        self.assertEqual(out, "Dependency graph of APP (packages: 3):\n"
+                              "  APP -> LIB\n  LIB -> CORE\n"
+                              "  CORE -> (none)\n")
 
     def test_registry_error_code(self):
         """Пакет не найден в реестре: сообщение в stderr и код 1."""
-        error = urllib.error.HTTPError(URL, 404, "Not Found", None, None)
-        with mock.patch("urllib.request.urlopen", side_effect=error):
-            code, out, err = self.run_main(
-                ["--package", "no-such-pkg", "--repo", URL])
+        code, out, err = self.run_main(
+            ["--package", "no-such-pkg", "--repo", URL])
         self.assertEqual((code, out), (1, ""))
         self.assertEqual(err, "depgraph: error: package not found: "
                               "'no-such-pkg'\n")
 
+    def test_root_missing_in_file(self):
+        """Корневого пакета нет в тестовом файле: код 1."""
+        code, _, err = self.run_file("Z", "simple.txt")
+        self.assertEqual(code, 1)
+        self.assertIn("package not found in test repository: 'Z'", err)
+
     def test_repo_file_error_code(self):
         """Ошибка формата тестового файла: код 1."""
-        code, _, err = self.run_main(
-            ["--package", "A", "--repo", os.path.join(REPOS, "broken.txt"),
-             "--test-mode"])
+        code, _, err = self.run_file("A", "broken.txt")
         self.assertEqual(code, 1)
         self.assertIn("expected 'NAME: DEPENDENCIES'", err)
 

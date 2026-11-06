@@ -157,5 +157,34 @@ class FlagAndFilterErrorTest(unittest.TestCase):
             ["--package", "react", "--repo", URL, "--filter"]))
 
 
+class ImageTest(unittest.TestCase):
+    """Параметр --image."""
+
+    def test_valid(self):
+        """Файл .svg в текущей или существующей папке."""
+        for path in ("graph.svg", os.path.join("repos", "Graph.SVG")):
+            args = parse_config(["--package", "react", "--repo", URL,
+                                 "--image", path])
+            self.assertEqual(args.image, path)
+
+    def test_not_set(self):
+        """По умолчанию изображение не сохраняется."""
+        args = parse_config(["--package", "react", "--repo", URL])
+        self.assertIsNone(args.image)
+
+    def test_wrong_extension(self):
+        """Расширение не .svg."""
+        self.assertEqual(parse_error(
+            ["--package", "react", "--repo", URL, "--image", "graph.png"]),
+            "--image: expected .svg file: 'graph.png'")
+
+    def test_missing_directory(self):
+        """Папки для файла нет."""
+        self.assertEqual(parse_error(
+            ["--package", "react", "--repo", URL, "--image",
+             "nope/graph.svg"]),
+            "--image: directory not found: 'nope'")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,98 @@
+Load order of body-parser@2.4.0:
+  1. bytes@3.1.2
+  2. content-type@3.1.1
+  3. ms@2.1.3
+  4. debug@4.4.3
+  5. depd@2.0.0
+  6. inherits@2.0.4
+  7. setprototypeof@1.2.0
+  8. statuses@2.0.2
+  9. toidentifier@1.0.1
+  10. http-errors@2.0.1
+  11. safer-buffer@2.1.2
+  12. iconv-lite@0.7.3
+  13. ee-first@1.1.1
+  14. on-finished@2.4.2
+  15. es-define-property@1.0.1
+  16. es-errors@1.3.0
+  17. object-inspect@1.13.4
+  18. side-channel-list@1.0.1
+  19. function-bind@1.1.2
+  20. call-bind-apply-helpers@1.0.2
+  21. es-object-atoms@1.1.2
+  22. gopd@1.2.0
+  23. dunder-proto@1.0.1
+  24. get-proto@1.0.1
+  25. has-symbols@1.1.0
+  26. hasown@2.0.4
+  27. math-intrinsics@1.1.0
+  28. get-intrinsic@1.3.0
+  29. call-bound@1.0.4
+  30. side-channel-map@1.0.1
+  31. side-channel-weakmap@1.0.2
+  32. side-channel@1.1.1
+  33. qs@6.17.1
+  34. raw-body@4.0.0
+  35. type-is@3.0.0
+  36. body-parser@2.4.0
+
+body-parser@2.4.0
+├── bytes@3.1.2
+├── content-type@3.1.1
+├── debug@4.4.3
+│   └── ms@2.1.3
+├── http-errors@2.0.1
+│   ├── depd@2.0.0
+│   ├── inherits@2.0.4
+│   ├── setprototypeof@1.2.0
+│   ├── statuses@2.0.2
+│   └── toidentifier@1.0.1
+├── iconv-lite@0.7.3
+│   └── safer-buffer@2.1.2
+├── on-finished@2.4.2
+│   └── ee-first@1.1.1
+├── qs@6.17.1
+│   ├── es-define-property@1.0.1
+│   └── side-channel@1.1.1
+│       ├── es-errors@1.3.0
+│       ├── object-inspect@1.13.4
+│       ├── side-channel-list@1.0.1
+│       │   ├── es-errors@1.3.0
+│       │   └── object-inspect@1.13.4
+│       ├── side-channel-map@1.0.1
+│       │   ├── call-bound@1.0.4
+│       │   │   ├── call-bind-apply-helpers@1.0.2
+│       │   │   │   ├── es-errors@1.3.0
+│       │   │   │   └── function-bind@1.1.2
+│       │   │   └── get-intrinsic@1.3.0
+│       │   │       ├── call-bind-apply-helpers@1.0.2 (see above)
+│       │   │       ├── es-define-property@1.0.1
+│       │   │       ├── es-errors@1.3.0
+│       │   │       ├── es-object-atoms@1.1.2
+│       │   │       │   └── es-errors@1.3.0
+│       │   │       ├── function-bind@1.1.2
+│       │   │       ├── get-proto@1.0.1
+│       │   │       │   ├── dunder-proto@1.0.1
+│       │   │       │   │   ├── call-bind-apply-helpers@1.0.2 (see above)
+│       │   │       │   │   ├── es-errors@1.3.0
+│       │   │       │   │   └── gopd@1.2.0
+│       │   │       │   └── es-object-atoms@1.1.2 (see above)
+│       │   │       ├── gopd@1.2.0
+│       │   │       ├── has-symbols@1.1.0
+│       │   │       ├── hasown@2.0.4
+│       │   │       │   └── function-bind@1.1.2
+│       │   │       └── math-intrinsics@1.1.0
+│       │   ├── es-errors@1.3.0
+│       │   ├── get-intrinsic@1.3.0 (see above)
+│       │   └── object-inspect@1.13.4
+│       └── side-channel-weakmap@1.0.2
+│           ├── call-bound@1.0.4 (see above)
+│           ├── es-errors@1.3.0
+│           ├── get-intrinsic@1.3.0 (see above)
+│           ├── object-inspect@1.13.4
+│           └── side-channel-map@1.0.1 (see above)
+├── raw-body@4.0.0
+│   ├── bytes@3.1.2
+│   └── http-errors@2.0.1 (see above)
+└── type-is@3.0.0
+    └── content-type@3.1.1

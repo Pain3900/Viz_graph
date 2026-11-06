@@ -1,4 +1,4 @@
-"""Тесты точки входа: порядок загрузки и коды завершения."""
+"""Тесты точки входа: порядок загрузки, граф и коды завершения."""
 
 import contextlib
 import io
@@ -48,33 +48,54 @@ class MainTest(unittest.TestCase):
             ["--package", package, "--repo",
              os.path.join(REPOS, file_name), "--test-mode", *options])
 
-    def test_registry_order(self):
-        """Порядок загрузки из реестра: пакеты подписаны версиями."""
+    def test_registry_mermaid(self):
+        """Реестр: порядок загрузки и Mermaid, пакеты с версиями."""
         code, out, err = self.run_main(["--package", "debug", "--repo", URL])
         self.assertEqual((code, err), (0, ""))
         self.assertEqual(out, "Load order of debug@4.4.3:\n"
                               "  1. ms@2.1.3\n"
-                              "  2. debug@4.4.3\n")
+                              "  2. debug@4.4.3\n"
+                              "\n"
+                              "graph TD\n"
+                              '    n1["debug@4.4.3"]\n'
+                              '    n2["ms@2.1.3"]\n'
+                              "    n1 --> n2\n")
 
     def test_simple_file(self):
-        """Транзитивные зависимости из тестового файла."""
+        """Тестовый файл: Mermaid по умолчанию."""
         code, out, _ = self.run_file("A", "simple.txt")
         self.assertEqual(code, 0)
-        self.assertEqual(out, "Load order of A:\n"
-                              "  1. D\n  2. B\n  3. C\n  4. A\n")
+        self.assertTrue(out.startswith("Load order of A:\n"
+                                       "  1. D\n  2. B\n  3. C\n"
+                                       "  4. A\n\ngraph TD\n"))
 
-    def test_cycle_file(self):
-        """Цикл выводится отдельной строкой после порядка."""
-        _, out, _ = self.run_file("A", "cycle.txt")
+    def test_cycle_ascii_tree(self):
+        """Цикл и ASCII-дерево вместо Mermaid."""
+        _, out, _ = self.run_file("A", "cycle.txt", "--ascii-tree")
         self.assertEqual(out, "Load order of A:\n"
                               "  1. D\n  2. C\n  3. B\n  4. A\n"
-                              "Cycle: A -> B -> C -> A\n")
+                              "Cycle: A -> B -> C -> A\n"
+                              "\n"
+                              "A\n"
+                              "└── B\n"
+                              "    └── C\n"
+                              "        ├── A (cycle)\n"
+                              "        └── D\n")
 
     def test_filter_file(self):
         """Фильтр исключает пакеты с подстрокой."""
-        _, out, _ = self.run_file("APP", "filter.txt", "--filter", "TEST")
+        _, out, _ = self.run_file("APP", "filter.txt", "--filter", "TEST",
+                                  "--ascii-tree")
         self.assertEqual(out, "Load order of APP:\n"
-                              "  1. CORE\n  2. LIB\n  3. APP\n")
+                              "  1. CORE\n  2. LIB\n  3. APP\n"
+                              "\nAPP\n└── LIB\n    └── CORE\n")
+
+    def test_image_error_code(self):
+        """Не удалось получить изображение: код 1."""
+        code, _, err = self.run_file("A", "simple.txt", "--image",
+                                     os.path.join(REPOS, "..", "x.svg"))
+        self.assertEqual(code, 1)
+        self.assertIn("cannot render image", err)
 
     def test_registry_error_code(self):
         """Пакет не найден в реестре: сообщение в stderr и код 1."""

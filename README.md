@@ -5,10 +5,11 @@
 зависимостей пакетов JavaScript (npm). Готовые менеджеры пакетов и
 библиотеки для получения зависимостей не используются.
 
-Текущий этап — **Этап 4. Дополнительные операции**: приложение строит
-граф зависимостей пакета с учётом транзитивности, исключает пакеты по
-подстроке фильтра, находит циклические зависимости и выводит порядок
-загрузки зависимостей. Порядок сравнивается с работой npm.
+Текущий этап — **Этап 5. Визуализация**: приложение строит граф
+зависимостей пакета с учётом транзитивности, исключает пакеты по
+подстроке фильтра, находит циклические зависимости, выводит порядок
+загрузки и граф: текстом на языке Mermaid, изображением SVG или
+ASCII-деревом. Результаты сравниваются с работой npm.
 
 | Этап | Что выводит приложение |
 |------|------------------------|
@@ -16,6 +17,10 @@
 | 2 | прямые зависимости пакета |
 | 3 | граф зависимостей и найденные циклы |
 | 4 | порядок загрузки зависимостей и найденные циклы |
+| 5 | порядок загрузки, циклы и граф (Mermaid или ASCII-дерево), изображение SVG |
+
+Каждый этап хранится в своей ветке (`stage-1` … `stage-5`) и слит в
+`main`.
 
 ## Структура проекта
 
@@ -26,9 +31,11 @@ src/depgraph/
     registry.py   запрос метаданных пакета к реестру npm
     repo_file.py  чтение тестового репозитория из файла
     graph.py      построение графа (DFS без рекурсии), порядок загрузки
-tests/            модульные тесты (unittest)
+    render.py     Mermaid, ASCII-дерево, сохранение изображения
+tests/            модульные тесты (unittest), сеть в тестах не нужна
 scripts/          скрипты для демонстрации работы
 repos/            тестовые репозитории
+examples/         примеры визуализации трёх пакетов и вывод npm ls
 run.sh, run.bat   запуск приложения
 test.sh, test.bat запуск тестов
 ```
@@ -40,11 +47,9 @@ test.sh, test.bat запуск тестов
 | `--package ИМЯ` | да | имя анализируемого пакета |
 | `--repo URL_ИЛИ_ПУТЬ` | да | URL репозитория пакетов или, в тестовом режиме, путь к файлу тестового репозитория |
 | `--test-mode` | нет | работать с тестовым репозиторием из файла |
-| `--ascii-tree` | нет | выводить зависимости в виде ASCII-дерева |
+| `--ascii-tree` | нет | выводить зависимости ASCII-деревом вместо текста Mermaid |
 | `--filter ПОДСТРОКА` | нет | не учитывать пакеты, имя которых содержит подстроку |
-
-Параметр `--ascii-tree` проверяется, но используется начиная с
-Этапа 5.
+| `--image ФАЙЛ.svg` | нет | сохранить изображение графа в файл SVG |
 
 ### Проверка параметров
 
@@ -54,6 +59,7 @@ test.sh, test.bat запуск тестов
 | `--repo` | непустое; в обычном режиме — URL со схемой `http` или `https` и адресом сервера; в тестовом режиме — путь к существующему файлу |
 | `--test-mode`, `--ascii-tree` | флаги, значений не принимают |
 | `--filter` | непустая подстрока без пробелов |
+| `--image` | имя файла с расширением `.svg`; папка, в которой он создаётся, должна существовать |
 
 Ошибка параметра выводится в поток ошибок, приложение завершается
 с кодом 2:
@@ -70,6 +76,8 @@ test.sh, test.bat запуск тестов
 | `--ascii-tree=1` | `depgraph: error: argument --ascii-tree: ignored explicit argument '1'` |
 | `--filter ""` | `depgraph: error: --filter: substring must not be empty` |
 | `--filter "a b"` | `depgraph: error: --filter: substring must not contain spaces: 'a b'` |
+| `--image graph.png` | `depgraph: error: --image: expected .svg file: 'graph.png'` |
+| `--image nope/graph.svg` | `depgraph: error: --image: directory not found: 'nope'` |
 | `--depth 2` | `depgraph: error: unrecognized arguments: --depth 2` |
 
 ## Сбор данных
@@ -108,6 +116,8 @@ test.sh, test.bat запуск тестов
 | неверное имя в файле | `depgraph: error: ФАЙЛ:N: invalid package name 'a'` |
 | пакет описан дважды | `depgraph: error: ФАЙЛ:N: package 'A' is defined twice` |
 | пакета нет в файле | `depgraph: error: package not found in test repository: 'Z'` |
+| не удалось получить изображение | `depgraph: error: cannot render image: причина` |
+| не удалось записать файл изображения | `depgraph: error: cannot write 'ФАЙЛ': причина` |
 
 ## Тестовый репозиторий
 
@@ -217,12 +227,88 @@ Node.js с npm). Он выводит порядок загрузки прило�
    ребро цикла.
 
 
+## Визуализация
+
+После порядка загрузки выводится граф (`render.py`). По умолчанию —
+текст на языке Mermaid. Узлы получают идентификаторы `n1`, `n2`, … в
+порядке обхода, а имя пакета записывается подписью в кавычках: имена
+npm содержат `@`, `/` и `.`, которые нельзя использовать в
+идентификаторах Mermaid. Текст можно вставить в https://mermaid.live
+или в Markdown на GitHub, где он отрисуется картинкой.
+
+С флагом `--ascii-tree` вместо текста Mermaid выводится дерево (тоже
+обходом без рекурсии). Пакет, у которого есть зависимости и который
+уже показан выше, помечается `(see above)` и повторно не раскрывается.
+Ребро, замыкающее цикл, помечается `(cycle)`.
+
+С опцией `--image ФАЙЛ.svg` текст Mermaid кодируется в base64 и
+отправляется в сервис https://mermaid.ink, который возвращает
+изображение SVG; оно сохраняется в файл. Для этого нужен интернет,
+даже в тестовом режиме.
+
+### Примеры для трёх пакетов
+
+Скрипт `sh scripts/demo_stage5.sh` создаёт в папке `examples/` для
+пакетов `debug`, `accepts` и `body-parser` текст Mermaid (`.mmd`),
+изображение (`.svg`) и вывод с ASCII-деревом (`.txt`). Файлы
+`*-npm.txt` — вывод `npm ls --all` после `npm install` того же пакета
+(ноябрь 2026, npm 10.9.7).
+
+| Пакет | Пакетов в графе | Пакетов у npm | Файлы |
+|-------|-----------------|---------------|-------|
+| `debug` | 2 | 2 | `debug.mmd`, `debug.svg`, `debug.txt`, `debug-npm.txt` |
+| `accepts` | 5 | 4 | `accepts.mmd`, `accepts.svg`, `accepts.txt`, `accepts-npm.txt` |
+| `body-parser` | 36 | 40 | `body-parser.mmd`, `body-parser.svg`, `body-parser.txt`, `body-parser-npm.txt` |
+
+Версии и состав зависимостей зависят от момента запуска: реестр
+отдаёт текущую версию `latest`.
+
+### Сравнение с npm ls
+
+Дерево `accepts` у приложения и у `npm ls --all`:
+
+```
+accepts@1.3.8                     accepts@1.3.8
+├── mime-types@3.0.2              ├─┬ mime-types@2.1.35
+│   └── mime-db@1.54.0            │ └── mime-db@1.52.0
+└── negotiator@1.1.0              └── negotiator@0.6.3
+    └── content-type@3.1.1
+```
+
+Расхождения и их причины:
+
+1. **Версии.** Как и в порядке загрузки, `npm ls` показывает версии,
+   которые npm выбрал по диапазонам (`mime-types ~2.1.34` →
+   `2.1.35`), а приложение — `latest` (`3.0.2`). У другой версии могут
+   быть другие зависимости: у `negotiator@1.1.0` есть `content-type`,
+   у `negotiator@0.6.3` зависимостей нет. Для `body-parser` это даёт
+   разницу в пакетах: например, он требует `content-type ^2.1.0`,
+   `raw-body ^3.0.2`, `type-is ^2.1.0`, и npm ставит `2.1.0`, `3.0.2`,
+   `2.1.0`, а приложение берёт `3.1.1`, `4.0.0`, `3.0.0`. Итог: 40
+   пакетов у npm и 36 у приложения.
+2. **Повторы.** `npm ls` показывает пакет, который уже встречался,
+   с пометкой `deduped` (в `body-parser-npm.txt` таких строк 25).
+   Приложение пишет `(see above)` и только для пакетов с
+   зависимостями, а лист выводит заново без пометки.
+3. **Расположение, а не зависимости.** `npm ls` строит дерево по
+   папкам `node_modules`: при нескольких версиях одного пакета
+   вложенная копия показывается внутри того пакета, которому она
+   нужна. Приложение строит дерево по зависимостям, у каждого имени
+   один узел.
+4. **Корень.** `npm ls` выводит проект, в который пакет поставлен
+   (`npm-example@1.0.0`), приложение — сам пакет.
+5. **Виды зависимостей.** `npm ls --all` показывает и установленные
+   `peerDependencies` и `optionalDependencies`, приложение — только
+   `dependencies`.
+6. **Изображение.** Штатного средства для картинки графа у npm нет;
+   Mermaid и SVG — возможность только приложения.
+
 ## Сборка и запуск
 
 Требуется Python 3.8+, сторонние библиотеки не нужны.
 
 ```sh
-sh run.sh --package ИМЯ --repo URL [--test-mode] [--ascii-tree] [--filter ПОДСТРОКА]
+sh run.sh --package ИМЯ --repo URL [--test-mode] [--ascii-tree] [--filter ПОДСТРОКА] [--image ФАЙЛ.svg]
 run.bat --package ИМЯ --repo URL ...      # Windows
 ```
 
@@ -241,12 +327,11 @@ sh scripts/demo_errors.sh   # ошибки для каждого парамет�
 sh scripts/demo_stage2.sh   # Этап 2: данные из реестра и файла, ошибки
 sh scripts/demo_stage3.sh   # Этап 3: ромб, цикл, фильтр, реестр npm
 sh scripts/demo_stage4.sh   # Этап 4: порядок загрузки
+sh scripts/demo_stage5.sh   # Этап 5: визуализация, примеры в examples/
 sh scripts/compare_npm.sh accepts   # сравнение с npm (нужен npm)
 ```
 
 ## Примеры использования
-
-Версии пакетов из реестра зависят от момента запуска.
 
 ```
 $ sh run.sh --package A --repo repos/simple.txt --test-mode
@@ -256,7 +341,17 @@ Load order of A:
   3. C
   4. A
 
-$ sh run.sh --package A --repo repos/cycle.txt --test-mode
+graph TD
+    n1["A"]
+    n2["B"]
+    n3["D"]
+    n4["C"]
+    n1 --> n2
+    n1 --> n4
+    n2 --> n3
+    n4 --> n3
+
+$ sh run.sh --package A --repo repos/cycle.txt --test-mode --ascii-tree
 Load order of A:
   1. D
   2. C
@@ -264,19 +359,31 @@ Load order of A:
   4. A
 Cycle: A -> B -> C -> A
 
-$ sh run.sh --package APP --repo repos/filter.txt --test-mode --filter TEST
+A
+└── B
+    └── C
+        ├── A (cycle)
+        └── D
+
+$ sh run.sh --package APP --repo repos/filter.txt --test-mode --ascii-tree --filter TEST
 Load order of APP:
   1. CORE
   2. LIB
   3. APP
 
-$ sh run.sh --package debug --repo https://registry.npmjs.org
+APP
+└── LIB
+    └── CORE
+
+$ sh run.sh --package debug --repo https://registry.npmjs.org --image examples/debug.svg
 Load order of debug@4.4.3:
   1. ms@2.1.3
   2. debug@4.4.3
 
-$ sh run.sh --package no-such-package-depgraph --repo https://registry.npmjs.org
-depgraph: error: package not found: 'no-such-package-depgraph'
+graph TD
+    n1["debug@4.4.3"]
+    n2["ms@2.1.3"]
+    n1 --> n2
 
 $ sh run.sh --package React --repo https://registry.npmjs.org
 depgraph: error: --package: name must be lowercase: 'React'

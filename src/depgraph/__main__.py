@@ -2,12 +2,14 @@
 
 import sys
 
-from depgraph import registry, repo_file
+from depgraph import registry, render, repo_file
 from depgraph.config import PROGRAM_NAME, ConfigError, parse_config
 from depgraph.graph import build_graph, load_order
 
 CONFIG_ERROR_CODE = 2
 DATA_ERROR_CODE = 1
+DATA_ERRORS = (registry.RegistryError, repo_file.RepoFileError,
+               render.RenderError)
 
 
 def file_source(path, root):
@@ -55,6 +57,20 @@ def format_load_order(graph, cycles, labels):
     return lines
 
 
+def visualize(args, graph, labels):
+    """Вывести граф (Mermaid или ASCII-дерево), сохранить изображение."""
+    mermaid = render.to_mermaid(graph, labels)
+    if args.ascii_tree:
+        lines = render.ascii_tree(graph, args.package, labels)
+    else:
+        lines = mermaid
+    print()
+    for line in lines:
+        print(line)
+    if args.image:
+        render.save_image(mermaid, args.image)
+
+
 def report_error(exc, code):
     """Вывести ошибку в stderr и вернуть код завершения."""
     print(f"{PROGRAM_NAME}: error: {exc}", file=sys.stderr)
@@ -62,17 +78,18 @@ def report_error(exc, code):
 
 
 def main(argv=None):
-    """Разобрать параметры, вывести порядок загрузки зависимостей."""
+    """Разобрать параметры, вывести порядок загрузки и граф."""
     try:
         args = parse_config(argv)
     except ConfigError as exc:
         return report_error(exc, CONFIG_ERROR_CODE)
     try:
         graph, cycles, labels = collect_graph(args)
-    except (registry.RegistryError, repo_file.RepoFileError) as exc:
+        for line in format_load_order(graph, cycles, labels):
+            print(line)
+        visualize(args, graph, labels)
+    except DATA_ERRORS as exc:
         return report_error(exc, DATA_ERROR_CODE)
-    for line in format_load_order(graph, cycles, labels):
-        print(line)
     return 0
 
 

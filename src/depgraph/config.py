@@ -17,6 +17,7 @@ NOT_SET = "(not set)"
 NPM_NAME_PATTERN = re.compile(
     r"^(@[a-z0-9~-][a-z0-9._~-]*/)?[a-z0-9~-][a-z0-9._~-]*$")
 TEST_NAME_PATTERN = re.compile(r"^[A-Z]+$")
+IMAGE_EXTENSION = ".svg"
 
 
 class ConfigError(Exception):
@@ -43,6 +44,9 @@ def build_parser():
     parser.add_argument(
         "--filter", default=None,
         help="не учитывать пакеты, имя которых содержит подстроку")
+    parser.add_argument(
+        "--image", default=None,
+        help="сохранить изображение графа в файл SVG")
     return parser
 
 
@@ -92,6 +96,17 @@ def check_filter(substring):
             f"--filter: substring must not contain spaces: '{substring}'")
 
 
+def check_image(path):
+    """Проверить файл изображения: расширение .svg, папка существует."""
+    if path is None:
+        return
+    if not path.lower().endswith(IMAGE_EXTENSION):
+        raise ConfigError(f"--image: expected .svg file: '{path}'")
+    directory = os.path.dirname(path)
+    if directory and not os.path.isdir(directory):
+        raise ConfigError(f"--image: directory not found: '{directory}'")
+
+
 def validate(args):
     """Проверить значения всех параметров.
 
@@ -106,6 +121,7 @@ def validate(args):
     else:
         check_url(args.repo)
     check_filter(args.filter)
+    check_image(args.image)
 
 
 def parse_config(argv=None):

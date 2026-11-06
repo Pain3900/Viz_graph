@@ -97,6 +97,24 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("cannot render image", err)
 
+    def test_reverse(self):
+        """Обратные зависимости: кто зависит от D напрямую и через других."""
+        _, out, _ = self.run_file("D", "simple.txt", "--reverse")
+        self.assertEqual(out, "Reverse dependencies of D (dependents: 3):\n"
+                              "  D <- B, C\n  B <- A\n"
+                              "  A <- (none)\n  C <- A\n")
+
+    def test_reverse_cycle_and_filter(self):
+        """Цикл и фильтр работают и для обратных зависимостей."""
+        _, out, _ = self.run_file("A", "cycle.txt", "--reverse")
+        self.assertTrue(out.endswith("Cycle: A <- C <- B <- A\n"))
+        _, out, _ = self.run_file("CORE", "filter.txt", "--reverse",
+                                  "--filter", "TEST")
+        self.assertEqual(out, "Reverse dependencies of CORE "
+                              "(dependents: 2):\n"
+                              "  CORE <- LIB\n  LIB <- APP\n"
+                              "  APP <- (none)\n")
+
     def test_registry_error_code(self):
         """Пакет не найден в реестре: сообщение в stderr и код 1."""
         code, out, err = self.run_main(

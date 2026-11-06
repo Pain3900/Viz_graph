@@ -35,6 +35,31 @@ def registry_source(url, labels):
     return get_dependencies
 
 
+def collect_reverse(args):
+    """Построить граф обратных зависимостей по тестовому файлу.
+
+    Используется тот же обход в глубину, что и для прямых
+    зависимостей, но по рёбрам "от зависимости к зависящему пакету".
+    """
+    packages = repo_file.load_repo(args.repo)
+    repo_file.direct_dependencies(packages, args.package)
+    dependents = repo_file.reverse_dependencies(packages)
+    return build_graph(args.package, lambda name: dependents.get(name, []),
+                       args.filter)
+
+
+def format_reverse(graph, cycles):
+    """Оформить обратные зависимости: пакет <- кто от него зависит."""
+    root = next(iter(graph))
+    lines = [f"Reverse dependencies of {root} "
+             f"(dependents: {len(graph) - 1}):"]
+    for name, dependents in graph.items():
+        lines.append(f"  {name} <- {', '.join(dependents) or '(none)'}")
+    for cycle in cycles:
+        lines.append("Cycle: " + " <- ".join(cycle))
+    return lines
+
+
 def collect_graph(args):
     """Построить граф; вернуть (граф, циклы, подписи пакетов)."""
     labels = {}
@@ -71,6 +96,20 @@ def visualize(args, graph, labels):
         render.save_image(mermaid, args.image)
 
 
+def show_reverse(args):
+    """Вывести обратные зависимости пакета."""
+    for line in format_reverse(*collect_reverse(args)):
+        print(line)
+
+
+def show_graph(args):
+    """Вывести порядок загрузки и граф, сохранить изображение."""
+    graph, cycles, labels = collect_graph(args)
+    for line in format_load_order(graph, cycles, labels):
+        print(line)
+    visualize(args, graph, labels)
+
+
 def report_error(exc, code):
     """Вывести ошибку в stderr и вернуть код завершения."""
     print(f"{PROGRAM_NAME}: error: {exc}", file=sys.stderr)
@@ -84,10 +123,10 @@ def main(argv=None):
     except ConfigError as exc:
         return report_error(exc, CONFIG_ERROR_CODE)
     try:
-        graph, cycles, labels = collect_graph(args)
-        for line in format_load_order(graph, cycles, labels):
-            print(line)
-        visualize(args, graph, labels)
+        if args.reverse:
+            show_reverse(args)
+        else:
+            show_graph(args)
     except DATA_ERRORS as exc:
         return report_error(exc, DATA_ERROR_CODE)
     return 0

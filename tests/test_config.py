@@ -186,5 +186,21 @@ class ImageTest(unittest.TestCase):
             "--image: directory not found: 'nope'")
 
 
+class ReverseTest(unittest.TestCase):
+    """Флаг --reverse."""
+
+    def test_test_mode(self):
+        """В тестовом режиме флаг допустим."""
+        args = parse_config(["--package", "A", "--repo", TEST_REPO,
+                             "--test-mode", "--reverse"])
+        self.assertTrue(args.reverse)
+
+    def test_registry_mode(self):
+        """Для реестра npm обратные зависимости не поддерживаются."""
+        self.assertEqual(parse_error(
+            ["--package", "ms", "--repo", URL, "--reverse"]),
+            "--reverse: works only with --test-mode")
+
+
 if __name__ == "__main__":
     unittest.main()

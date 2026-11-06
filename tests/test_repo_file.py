@@ -4,7 +4,8 @@ import os
 import unittest
 
 from depgraph.repo_file import (RepoFileError, direct_dependencies,
-                                load_repo, parse_repo)
+                                load_repo, parse_repo,
+                                reverse_dependencies)
 
 REPOS = os.path.join(os.path.dirname(__file__), "..", "repos")
 
@@ -37,6 +38,12 @@ class ParseRepoTest(unittest.TestCase):
         packages = {"A": ["B", "C"], "B": []}
         self.assertEqual(direct_dependencies(packages, "A"), ["B", "C"])
         self.assertEqual(direct_dependencies(packages, "B"), [])
+
+    def test_reverse_dependencies(self):
+        """Обратные зависимости: кто зависит от пакета."""
+        packages = {"A": ["B", "C"], "B": ["D"], "C": ["D"], "D": []}
+        self.assertEqual(reverse_dependencies(packages),
+                         {"B": ["A"], "C": ["A"], "D": ["B", "C"]})
 
 
 class RepoFileErrorTest(unittest.TestCase):

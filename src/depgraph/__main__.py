@@ -4,7 +4,7 @@ import sys
 
 from depgraph import registry, repo_file
 from depgraph.config import PROGRAM_NAME, ConfigError, parse_config
-from depgraph.graph import build_graph
+from depgraph.graph import build_graph, load_order
 
 CONFIG_ERROR_CODE = 2
 DATA_ERROR_CODE = 1
@@ -44,14 +44,12 @@ def collect_graph(args):
     return graph, cycles, labels
 
 
-def format_graph(graph, cycles, labels):
-    """Оформить граф списком смежности и строками циклов."""
+def format_load_order(graph, cycles, labels):
+    """Оформить порядок загрузки и найденные циклы."""
     root = next(iter(graph))
-    lines = [f"Dependency graph of {labels.get(root, root)} "
-             f"(packages: {len(graph)}):"]
-    for name, dependencies in graph.items():
-        targets = ", ".join(dependencies) or "(none)"
-        lines.append(f"  {labels.get(name, name)} -> {targets}")
+    lines = [f"Load order of {labels.get(root, root)}:"]
+    for number, name in enumerate(load_order(graph, root), start=1):
+        lines.append(f"  {number}. {labels.get(name, name)}")
     for cycle in cycles:
         lines.append("Cycle: " + " -> ".join(cycle))
     return lines
@@ -64,7 +62,7 @@ def report_error(exc, code):
 
 
 def main(argv=None):
-    """Разобрать параметры, построить и вывести граф зависимостей."""
+    """Разобрать параметры, вывести порядок загрузки зависимостей."""
     try:
         args = parse_config(argv)
     except ConfigError as exc:
@@ -73,7 +71,7 @@ def main(argv=None):
         graph, cycles, labels = collect_graph(args)
     except (registry.RegistryError, repo_file.RepoFileError) as exc:
         return report_error(exc, DATA_ERROR_CODE)
-    for line in format_graph(graph, cycles, labels):
+    for line in format_load_order(graph, cycles, labels):
         print(line)
     return 0
 

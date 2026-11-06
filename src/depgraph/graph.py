@@ -47,3 +47,27 @@ def build_graph(root, get_dependencies, name_filter=None):
             start = path.index(dependency)
             cycles.append(path[start:] + [dependency])
     return graph, cycles
+
+
+def load_order(graph, root):
+    """Вернуть порядок загрузки: каждый пакет после своих зависимостей.
+
+    Это порядок, в котором пакеты заканчивают обход в глубину (без
+    рекурсии). Ребро, замыкающее цикл, пропускается, поэтому пакет,
+    на котором цикл замкнулся, оказывается после остальных пакетов
+    цикла.
+    """
+    order = []
+    seen = {root}
+    path = [root]
+    stack = [iter(graph[root])]
+    while stack:
+        dependency = next(stack[-1], None)
+        if dependency is None:
+            stack.pop()
+            order.append(path.pop())
+        elif dependency not in seen:
+            seen.add(dependency)
+            path.append(dependency)
+            stack.append(iter(graph[dependency]))
+    return order

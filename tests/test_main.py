@@ -1,4 +1,4 @@
-"""Тесты точки входа: вывод графа и коды завершения."""
+"""Тесты точки входа: порядок загрузки и коды завершения."""
 
 import contextlib
 import io
@@ -48,34 +48,33 @@ class MainTest(unittest.TestCase):
             ["--package", package, "--repo",
              os.path.join(REPOS, file_name), "--test-mode", *options])
 
-    def test_registry_graph(self):
-        """Граф из реестра: пакеты подписаны версиями."""
+    def test_registry_order(self):
+        """Порядок загрузки из реестра: пакеты подписаны версиями."""
         code, out, err = self.run_main(["--package", "debug", "--repo", URL])
         self.assertEqual((code, err), (0, ""))
-        self.assertEqual(out, "Dependency graph of debug@4.4.3 "
-                              "(packages: 2):\n"
-                              "  debug@4.4.3 -> ms\n"
-                              "  ms@2.1.3 -> (none)\n")
+        self.assertEqual(out, "Load order of debug@4.4.3:\n"
+                              "  1. ms@2.1.3\n"
+                              "  2. debug@4.4.3\n")
 
     def test_simple_file(self):
         """Транзитивные зависимости из тестового файла."""
         code, out, _ = self.run_file("A", "simple.txt")
         self.assertEqual(code, 0)
-        self.assertEqual(out, "Dependency graph of A (packages: 4):\n"
-                              "  A -> B, C\n  B -> D\n"
-                              "  D -> (none)\n  C -> D\n")
+        self.assertEqual(out, "Load order of A:\n"
+                              "  1. D\n  2. B\n  3. C\n  4. A\n")
 
     def test_cycle_file(self):
-        """Цикл выводится отдельной строкой."""
+        """Цикл выводится отдельной строкой после порядка."""
         _, out, _ = self.run_file("A", "cycle.txt")
-        self.assertTrue(out.endswith("Cycle: A -> B -> C -> A\n"))
+        self.assertEqual(out, "Load order of A:\n"
+                              "  1. D\n  2. C\n  3. B\n  4. A\n"
+                              "Cycle: A -> B -> C -> A\n")
 
     def test_filter_file(self):
         """Фильтр исключает пакеты с подстрокой."""
         _, out, _ = self.run_file("APP", "filter.txt", "--filter", "TEST")
-        self.assertEqual(out, "Dependency graph of APP (packages: 3):\n"
-                              "  APP -> LIB\n  LIB -> CORE\n"
-                              "  CORE -> (none)\n")
+        self.assertEqual(out, "Load order of APP:\n"
+                              "  1. CORE\n  2. LIB\n  3. APP\n")
 
     def test_registry_error_code(self):
         """Пакет не найден в реестре: сообщение в stderr и код 1."""

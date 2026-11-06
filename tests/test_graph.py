@@ -3,7 +3,7 @@
 import sys
 import unittest
 
-from depgraph.graph import build_graph
+from depgraph.graph import build_graph, load_order
 
 
 def source(packages):
@@ -80,6 +80,44 @@ class BuildGraphTest(unittest.TestCase):
         graph, cycles = build_graph("P0", source(packages))
         self.assertEqual(len(graph), length + 1)
         self.assertEqual(cycles, [])
+
+
+class LoadOrderTest(unittest.TestCase):
+    """Порядок загрузки: зависимости раньше зависящих пакетов."""
+
+    def test_shared_dependency(self):
+        """Ромб: общая зависимость загружается первой и один раз."""
+        graph = {"A": ["B", "C"], "B": ["D"], "C": ["D"], "D": []}
+        self.assertEqual(load_order(graph, "A"), ["D", "B", "C", "A"])
+
+    def test_single_package(self):
+        """Пакет без зависимостей."""
+        self.assertEqual(load_order({"A": []}, "A"), ["A"])
+
+    def test_every_package_after_dependencies(self):
+        """Каждый пакет идёт после всех своих зависимостей."""
+        graph = {"A": ["B", "C", "E"], "B": ["C"], "C": ["D"],
+                 "D": [], "E": ["D", "B"]}
+        order = load_order(graph, "A")
+        self.assertEqual(sorted(order), sorted(graph))
+        for name, dependencies in graph.items():
+            for dependency in dependencies:
+                self.assertLess(order.index(dependency), order.index(name))
+
+    def test_cycle(self):
+        """В цикле пропускается замыкающее ребро, корень последний."""
+        graph = {"A": ["B"], "B": ["C"], "C": ["A", "D"], "D": []}
+        self.assertEqual(load_order(graph, "A"), ["D", "C", "B", "A"])
+        self.assertEqual(load_order(graph, "C"), ["B", "A", "D", "C"])
+
+    def test_deep_chain_without_recursion(self):
+        """Цепочка длиннее лимита рекурсии Python."""
+        length = sys.getrecursionlimit() * 2
+        graph = {f"P{i}": [f"P{i + 1}"] for i in range(length)}
+        graph[f"P{length}"] = []
+        order = load_order(graph, "P0")
+        self.assertEqual(order[0], f"P{length}")
+        self.assertEqual(order[-1], "P0")
 
 
 if __name__ == "__main__":

@@ -57,6 +57,18 @@ def load_repo(path):
         raise RepoFileError(f"cannot read '{path}': {exc}") from exc
 
 
+def reverse_dependencies(packages):
+    """Вернуть словарь ``имя -> [пакеты, которые от него зависят]``.
+
+    Зависящие пакеты идут в порядке их строк в файле.
+    """
+    dependents = {}
+    for name, dependencies in packages.items():
+        for dependency in dependencies:
+            dependents.setdefault(dependency, []).append(name)
+    return dependents
+
+
 def direct_dependencies(packages, name):
     """Вернуть прямые зависимости пакета из тестового репозитория."""
     if name not in packages:

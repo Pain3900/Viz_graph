@@ -43,6 +43,9 @@ def build_parser():
     parser.add_argument(
         "--filter", default=None,
         help="не учитывать пакеты, имя которых содержит подстроку")
+    parser.add_argument(
+        "--reverse", action="store_true",
+        help="вывести обратные зависимости (только с --test-mode)")
     return parser
 
 
@@ -106,6 +109,8 @@ def validate(args):
     else:
         check_url(args.repo)
     check_filter(args.filter)
+    if args.reverse and not args.test_mode:
+        raise ConfigError("--reverse: works only with --test-mode")
 
 
 def parse_config(argv=None):

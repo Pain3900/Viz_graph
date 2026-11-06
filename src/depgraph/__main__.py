@@ -33,6 +33,31 @@ def registry_source(url, labels):
     return get_dependencies
 
 
+def collect_reverse(args):
+    """Построить граф обратных зависимостей по тестовому файлу.
+
+    Используется тот же обход в глубину, что и для прямых
+    зависимостей, но по рёбрам "от зависимости к зависящему пакету".
+    """
+    packages = repo_file.load_repo(args.repo)
+    repo_file.direct_dependencies(packages, args.package)
+    dependents = repo_file.reverse_dependencies(packages)
+    return build_graph(args.package, lambda name: dependents.get(name, []),
+                       args.filter)
+
+
+def format_reverse(graph, cycles):
+    """Оформить обратные зависимости: пакет <- кто от него зависит."""
+    root = next(iter(graph))
+    lines = [f"Reverse dependencies of {root} "
+             f"(dependents: {len(graph) - 1}):"]
+    for name, dependents in graph.items():
+        lines.append(f"  {name} <- {', '.join(dependents) or '(none)'}")
+    for cycle in cycles:
+        lines.append("Cycle: " + " <- ".join(cycle))
+    return lines
+
+
 def collect_graph(args):
     """Построить граф; вернуть (граф, циклы, подписи пакетов)."""
     labels = {}
@@ -68,10 +93,13 @@ def main(argv=None):
     except ConfigError as exc:
         return report_error(exc, CONFIG_ERROR_CODE)
     try:
-        graph, cycles, labels = collect_graph(args)
+        if args.reverse:
+            lines = format_reverse(*collect_reverse(args))
+        else:
+            lines = format_load_order(*collect_graph(args))
     except (registry.RegistryError, repo_file.RepoFileError) as exc:
         return report_error(exc, DATA_ERROR_CODE)
-    for line in format_load_order(graph, cycles, labels):
+    for line in lines:
         print(line)
     return 0
 

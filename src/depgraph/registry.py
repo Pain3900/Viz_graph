@@ -37,6 +37,7 @@ def fetch_metadata(repo, name):
                 request, timeout=TIMEOUT_SECONDS) as response:
             body = response.read()
     except urllib.error.HTTPError as exc:
+        exc.close()
         if exc.code == HTTP_NOT_FOUND:
             raise RegistryError(f"package not found: '{name}'") from exc
         raise RegistryError(

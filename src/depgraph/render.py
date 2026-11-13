@@ -40,9 +40,9 @@ def to_mermaid(graph, labels):
 
 def push_children(stack, children, prefix, ancestors):
     """Положить зависимости в стек так, чтобы первая вышла первой."""
-    for index in reversed(range(len(children))):
-        is_last = index == len(children) - 1
-        stack.append((children[index], prefix, is_last, ancestors))
+    count = len(children)
+    for number, child in reversed(list(enumerate(children, 1))):
+        stack.append((child, prefix, number == count, ancestors))
 
 
 def ascii_tree(graph, root, labels):

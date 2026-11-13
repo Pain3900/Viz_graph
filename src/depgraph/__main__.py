@@ -29,6 +29,7 @@ def registry_source(url, labels):
     Версия каждого пакета записывается в ``labels`` как ``имя@версия``.
     """
     def get_dependencies(name):
+        """Получить зависимости пакета и запомнить его версию."""
         version, dependencies = registry.direct_dependencies(url, name)
         labels[name] = f"{name}@{version}"
         return sorted(dependencies)

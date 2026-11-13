@@ -11,6 +11,7 @@ def source(packages):
     calls = []
 
     def get_dependencies(name):
+        """Вернуть зависимости пакета и записать обращение."""
         calls.append(name)
         return packages.get(name, [])
     get_dependencies.calls = calls
